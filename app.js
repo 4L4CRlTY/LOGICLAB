@@ -1,8 +1,9 @@
 const $=id=>document.getElementById(id);
 const STORAGE='logic-lab-v1';
+const EXERCISES=[...LESSONS,...SCENARIOS];
 let saved={drafts:{},completed:[],selected:'facts'};
 let storageOK=true;
-try{const raw=JSON.parse(localStorage.getItem(STORAGE));if(raw&&typeof raw==='object'){saved.drafts=raw.drafts&&typeof raw.drafts==='object'?raw.drafts:{};saved.completed=Array.isArray(raw.completed)?raw.completed.filter(id=>LESSONS.some(x=>x.id===id)):[];saved.selected=raw.selected||'facts';}}catch(e){storageOK=false;}
+try{const raw=JSON.parse(localStorage.getItem(STORAGE));if(raw&&typeof raw==='object'){saved.drafts=raw.drafts&&typeof raw.drafts==='object'?raw.drafts:{};saved.completed=Array.isArray(raw.completed)?[...new Set(raw.completed.filter(id=>EXERCISES.some(x=>x.id===id)))]:[];saved.selected=raw.selected||'facts';}}catch(e){storageOK=false;}
 let current,engine=null,busy=false,hasMore=false,toastTimer;
 function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(saved));storageOK=true;}catch(e){storageOK=false;}$('saveStatus').textContent=storageOK?'Saved in this browser':'Browser storage unavailable · download to save';}
 function saveDraft(){if(!current)return;saved.drafts[current.id]={code:$('code').value,query:$('query').value,input:$('stdin').value};persist();}
@@ -10,26 +11,36 @@ function toast(message){$('toast').textContent=message;$('toast').hidden=false;c
 function nav(){
  const root=$('exerciseList');root.replaceChildren();
  GROUPS.forEach((name,g)=>{const h=document.createElement('h3');h.textContent=`0${g+1} / ${name}`;root.append(h);LESSONS.filter(x=>x.group===g).forEach(l=>{const b=document.createElement('button');b.className=current?.id===l.id?'active':'';b.setAttribute('aria-current',current?.id===l.id?'step':'false');const n=document.createElement('span');n.className='number';n.textContent=saved.completed.includes(l.id)?'✓':String(LESSONS.indexOf(l)+1).padStart(2,'0');const t=document.createElement('span');t.textContent=l.title;b.append(n,t);b.onclick=()=>selectLesson(l.id);root.append(b);});});
- $('progress').max=LESSONS.length;$('progress').value=saved.completed.length;$('progressText').textContent=`${saved.completed.length} of ${LESSONS.length} exercises completed`;
+ const lessonCount=LESSONS.filter(x=>saved.completed.includes(x.id)).length;
+ $('progress').max=LESSONS.length;$('progress').value=lessonCount;$('progressText').textContent=`${lessonCount} of ${LESSONS.length} exercises completed`;
+ $('scenarioProgress').textContent=`${SCENARIOS.filter(x=>saved.completed.includes(x.id)).length} of ${SCENARIOS.length} scenarios completed`;
+ $('scenarioList').replaceChildren(...SCENARIOS.map((s,i)=>{const b=document.createElement('button');b.className=current?.id===s.id?'active':'';b.setAttribute('aria-current',current?.id===s.id?'step':'false');const n=document.createElement('span');n.className='number';n.textContent=saved.completed.includes(s.id)?'✓':String(i+1).padStart(2,'0');const t=document.createElement('span');t.textContent=s.title;b.append(n,t);b.onclick=()=>selectLesson(s.id);return b;}));
+ $('scenarioBtn').setAttribute('aria-pressed',String(current?.group===-2));
 }
 function selectLesson(id){
- if(busy)return;saveDraft();current=LESSONS.find(x=>x.id===id)||SANDBOX;saved.selected=current.id;
+ if(busy)return;saveDraft();current=EXERCISES.find(x=>x.id===id)||SANDBOX;saved.selected=current.id;
+ const scenario=current.group===-2;
+ $('scenarioPicker').hidden=!scenario;
+ $('scenarioSelect').replaceChildren(...SCENARIOS.map(s=>{const option=document.createElement('option');option.value=s.id;option.textContent=s.title;option.selected=s.id===current.id;return option;}));
  const draft=saved.drafts[current.id];$('code').value=typeof draft?.code==='string'?draft.code:current.starter;$('query').value=typeof draft?.query==='string'?draft.query:current.query;$('stdin').value=typeof draft?.input==='string'?draft.input:current.input;
- $('breadcrumb').textContent=current.group<0?'Workspace / Free playground':`Learning path / ${GROUPS[current.group]}`;
- $('lessonMeta').textContent=current.group<0?'EXPLORE WITHOUT LIMITS':`EXERCISE ${String(LESSONS.indexOf(current)+1).padStart(2,'0')} OF ${LESSONS.length}`;
- $('lessonTitle').textContent=current.title;$('difficulty').textContent=current.id==='reportchallenge'||current.id==='eligibility'?'Challenge':current.group===3?'Operators':current.group===2?'Hands-on':'Foundations';
+ $('breadcrumb').textContent=scenario?'Playground / Real-life scenarios':current.group<0?'Workspace / Free playground':`Learning path / ${GROUPS[current.group]}`;
+ $('lessonMeta').textContent=scenario?`SCENARIO ${SCENARIOS.indexOf(current)+1} OF ${SCENARIOS.length} · ILO1–ILO4`:current.group<0?'EXPLORE WITHOUT LIMITS':`EXERCISE ${String(LESSONS.indexOf(current)+1).padStart(2,'0')} OF ${LESSONS.length}`;
+ $('lessonTitle').textContent=current.title;$('difficulty').textContent=scenario?current.level:current.id==='reportchallenge'||current.id==='eligibility'?'Challenge':current.group===3?'Operators':current.group===2?'Hands-on':'Foundations';
+ $('scenarioGuide').hidden=!scenario;$('iloMap').replaceChildren(...(current.ilo||[]).map(text=>{const li=document.createElement('li');li.textContent=text;return li;}));
  $('description').textContent=current.description;$('concept').textContent=current.concept;$('requirements').replaceChildren(...current.requirements.map(x=>{const li=document.createElement('li');li.textContent=x;return li;}));
  $('exampleQuery').textContent='?- '+current.query;$('expected').textContent=current.expected;$('hint').textContent=current.hint;$('solution').textContent=current.solution;$('source').textContent=current.source;
  $('solutionDetails').hidden=current.id==='sandbox';$('solutionDetails').open=false;$('hintDetails').open=false;$('inputDetails').open=!!current.input;
  $('fileName').textContent=current.id+'.pl';$('check').hidden=current.id==='sandbox';$('checkStatus').textContent=saved.completed.includes(current.id)?'Completed · keep experimenting.':'Ready when you are.';
- $('nextExercise').hidden=current.id==='sandbox'||LESSONS.indexOf(current)===LESSONS.length-1;
+ const sequence=scenario?SCENARIOS:LESSONS;
+ $('nextExercise').hidden=current.id==='sandbox'||sequence.indexOf(current)===sequence.length-1;
+ $('nextExercise').textContent=scenario?'Next scenario →':'Next exercise';
  $('checkResults').replaceChildren();$('testCount').textContent='';clearConsole();switchTab('console');invalidate();lines();nav();persist();
 }
 function invalidate(){engine=null;hasMore=false;$('more').hidden=true;}
 function lines(){$('lineNumbers').textContent=Array.from({length:$('code').value.split('\n').length},(_,i)=>i+1).join('\n');}
 function clearConsole(){$('output').textContent='';$('output').classList.remove('error-text');$('welcome').hidden=false;$('more').hidden=true;hasMore=false;}
 function switchTab(name){const console=name==='console';$('consolePanel').hidden=!console;$('checksPanel').hidden=console;$('consoleTab').setAttribute('aria-selected',String(console));$('checksTab').setAttribute('aria-selected',String(!console));}
-function setBusy(value){busy=value;for(const id of ['run','check','resetCode','loadSolution','sandboxBtn','nextExercise','more'])$(id).disabled=value;$('code').readOnly=value;$('query').readOnly=value;$('stdin').readOnly=value;document.querySelectorAll('nav button').forEach(x=>x.disabled=value);$('run').textContent=value?'Running…':'Run query';}
+function setBusy(value){busy=value;for(const id of ['run','check','resetCode','loadSolution','sandboxBtn','scenarioBtn','scenarioSelect','nextExercise','more'])$(id).disabled=value;$('code').readOnly=value;$('query').readOnly=value;$('stdin').readOnly=value;document.querySelectorAll('nav button').forEach(x=>x.disabled=value);$('run').textContent=value?'Running…':'Run query';}
 function displayAnswer(answer){$('welcome').hidden=true;$('output').classList.remove('error-text');$('output').textContent+=answer.output+(answer.output&&!answer.output.endsWith('\n')?'\n':'')+answer.text+'\n';hasMore=answer.success;$('more').hidden=!hasMore;}
 function errorText(error){const text=error.message||String(error);let hint='';if(/syntax_error/.test(text))hint='Check punctuation, lowercase predicate names, and the final period.';else if(/existence_error/.test(text))hint='Check the predicate spelling and arity. Define it in the program before calling it.';else if(/instantiation_error/.test(text))hint='A goal needs a value but received an unbound variable. Bind arithmetic inputs before using is or a comparison.';else if(/permission_error/.test(text))hint='For assertz/retract, declare the predicate dynamic before its clauses.';return text+(hint?'\n\nTip: '+hint:'');}
 async function runQuery(){
@@ -64,7 +75,10 @@ $('loadSolution').onclick=()=>{if(confirm('Replace your current code with the wo
 $('clearOutput').onclick=()=>{clearConsole();switchTab('console');};$('consoleTab').onclick=()=>switchTab('console');$('checksTab').onclick=()=>switchTab('checks');
 for(const id of ['consoleTab','checksTab'])$(id).addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const other=id==='consoleTab'?'checksTab':'consoleTab';$(other).click();$(other).focus();}});
 $('referenceBtn').onclick=()=>reference();$('engineBtn').onclick=()=>reference(true);$('closeReference').onclick=()=>$('reference').close();
-$('sandboxBtn').onclick=()=>selectLesson('sandbox');$('nextExercise').onclick=()=>selectLesson(LESSONS[LESSONS.indexOf(current)+1].id);
+$('sandboxBtn').onclick=()=>selectLesson('sandbox');
+$('scenarioBtn').onclick=()=>selectLesson(SCENARIOS[0].id);
+$('scenarioSelect').onchange=e=>selectLesson(e.target.value);
+$('nextExercise').onclick=()=>{const sequence=current.group===-2?SCENARIOS:LESSONS;const next=sequence[sequence.indexOf(current)+1];if(next)selectLesson(next.id);};
 selectLesson(saved.selected);
 if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'run_prolog_query',title:'Run Prolog query',description:'Run a query against the currently visible Prolog program and show its first answer. This may change the running knowledge base or produce output.',inputSchema:{type:'object',properties:{query:{type:'string'},input:{type:'string'}},required:['query'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:true},execute:async args=>{if(!args||typeof args.query!=='string'||!args.query.trim()||args.query.length>10000||Object.keys(args).some(k=>!['query','input'].includes(k))||(args.input!==undefined&&typeof args.input!=='string'))throw new Error('Provide a nonempty query and optional text input.');if(busy)throw new Error('The interpreter is busy.');$('query').value=args.query;if(args.input!==undefined)$('stdin').value=args.input;return await runQuery();}})).catch(()=>{});}catch(e){/* Ordinary browser operation is unaffected. */}}
 

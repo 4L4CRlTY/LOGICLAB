@@ -15,6 +15,20 @@ Open **index.html** in Chrome, Edge, or Firefox. All interpreter files are inclu
 
 **Free playground** accepts your own programs and queries. **Download .pl** exports the current program for SWI-Prolog.
 
+## Scenario playground
+
+Choose **Scenario playground** to apply ILO1–ILO4 in five small Prolog projects:
+
+1. **Grading system** — weighted grades, a passing threshold, and a student report.
+2. **Billing system** — structured orders, quantities, discounts, and receipts.
+3. **Fare calculator** — distance calculations, passenger categories, and tickets.
+4. **Library loan system** — dynamic facts, borrowing/returning, and overdue notices.
+5. **Inventory checker** — compound-term inspection, stock reports, and a custom operator.
+
+Each scenario includes starter code, an ILO topic map, explicit requirements, sample input/output, a hint, a worked solution, and behavioral checks including boundary and invalid inputs. Start with facts and calculation rules, then add input/output. Scenario drafts and completion are saved separately from the 20 original lessons and the free playground. Prices, fares, fees, and grading thresholds are fictional practice rules.
+
+The collection revisits facts, rules, backtracking, data terms, dynamic knowledge bases, term inspection, I/O, and operators. You can keep experimenting after passing the checks. Checks verify sample behavior, not every possible program or whether you used a specific predicate.
+
 Code drafts and completion history are saved in localStorage in the current browser. A hosted copy and a downloaded copy have separate storage. Private browsing, clearing site data, moving the local app, or changing browsers can lose saved progress. Download programs you want to keep.
 
 ## Topics
@@ -49,11 +63,14 @@ The lecture statement that only `is/2` evaluates arithmetic is too broad: arithm
 - `index.html` — page structure
 - `styles.css` — responsive layout and theme
 - `lessons.js` — exercises, hints, worked solutions, and behavioral tests
+- `scenarios.js` — five ILO1–ILO4 mini-projects and their checks
 - `runtime.js` — interpreter sessions, input/output, and compatibility helper
 - `app.js` — editor controls, progress storage, and feedback
 - `vendor/` — bundled Tau Prolog modules and BSD license
 
 No build step is required. Serve `` with any static web server, or open index.html directly. Supported browsers can optionally expose the visible query runner through WebMCP.
+
+Run `node tests/scenarios.test.cjs` to verify all lesson and scenario worked solutions with the bundled interpreter, plus scenario starters, sample output, and library session behavior. No npm install is needed.
 
 ## Source material
 
